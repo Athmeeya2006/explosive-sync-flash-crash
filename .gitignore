@@ -16,12 +16,6 @@ CMakeCache.txt
 cmake_install.cmake
 compile_commands.json
 
-# Data and figures outputs
-data/*
-figures/*
-!data/.gitkeep
-!figures/.gitkeep
-
 # Jupyter
 .ipynb_checkpoints/
 
