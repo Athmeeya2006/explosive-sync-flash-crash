@@ -24,18 +24,12 @@ double order_parameter_complex(const std::vector<std::complex<double>>& state) {
   }
 
   std::complex<double> sum(0.0, 0.0);
-  int count = 0;
   for (const auto& z : state) {
     double mag = std::abs(z);
     if (mag > 0.0) {
       sum += z / mag;
-      ++count;
     }
   }
-
-  if (count == 0) {
-    return 0.0;
-  }
-
-  return std::abs(sum) / static_cast<double>(count);
+  const double n = static_cast<double>(state.size());
+  return std::abs(sum) / n;
 }

@@ -1,7 +1,10 @@
 #include "flash_crash.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
+
+#include "kuramoto_integrator.hpp"
 
 SimulationResult simulate_flash_crash(
     const Network& net,
@@ -22,40 +25,31 @@ SimulationResult simulate_flash_crash(
     throw std::runtime_error("tmax and dt must be positive");
   }
 
-  const int steps = static_cast<int>(tmax / dt);
   SimulationResult result;
-  result.times.reserve(steps + 1);
-  result.order.reserve(steps + 1);
+  const int reserve_steps = static_cast<int>(tmax / dt) + 2;
+  result.times.reserve(reserve_steps);
+  result.order.reserve(reserve_steps);
 
   std::vector<double> theta = theta0;
   double t = 0.0;
 
-  for (int step = 0; step <= steps; ++step) {
+  while (true) {
     result.times.push_back(t);
     result.order.push_back(order_parameter(theta));
 
-    if (step == steps) {
+    const double remaining = tmax - t;
+    if (remaining <= 0.0) {
       break;
     }
 
+    double dt_step = std::min(dt, remaining);
+    if (t < t_drop && t + dt_step > t_drop) {
+      dt_step = t_drop - t;
+    }
+
     const double k = (t < t_drop) ? k_high : k_low;
-    std::vector<double> dtheta(theta.size(), 0.0);
-
-    for (size_t i = 0; i < theta.size(); ++i) {
-      double sum = 0.0;
-      for (int j : net.adj[i]) {
-        sum += std::sin(theta[j] - theta[i]);
-      }
-      double deg = static_cast<double>(net.adj[i].size());
-      double coupling = (deg > 0.0) ? (k / deg) * sum : 0.0;
-      dtheta[i] = omega[i] + coupling;
-    }
-
-    for (size_t i = 0; i < theta.size(); ++i) {
-      theta[i] += dt * dtheta[i];
-    }
-
-    t += dt;
+    kuramoto_integrator::rk4_step(net, omega, k, dt_step, theta);
+    t += dt_step;
   }
 
   return result;

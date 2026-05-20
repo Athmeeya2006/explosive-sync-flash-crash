@@ -1,5 +1,6 @@
 #include <cmath>
 #include <complex>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <random>
@@ -13,6 +14,8 @@
 #include "stuart_landau.hpp"
 
 namespace {
+constexpr const char* kVersion = "0.1.0";
+
 struct Options {
   std::string system = "kuramoto";
   std::string network = "er";
@@ -23,6 +26,7 @@ struct Options {
   double tmax = 50.0;
   double dt = 0.05;
   unsigned int seed = 42;
+  std::string freq_mode = "gaussian";
   double omega_mean = 0.0;
   double omega_std = 1.0;
   double alpha = 1.0;
@@ -49,10 +53,12 @@ void print_help() {
       << "  --tmax <float>        Simulation horizon\n"
       << "  --dt <float>          Time step\n"
       << "  --seed <int>          RNG seed\n"
+      << "  --freq-mode {gaussian|degree-weighted}\n"
       << "  --omega-mean <float>  Mean of natural frequencies\n"
       << "  --omega-std <float>   Std dev of natural frequencies\n"
       << "  --alpha <float>       Stuart-Landau alpha parameter\n"
       << "  --out <path>          Output CSV path\n"
+      << "  --version             Show version\n"
       << "  --help                Show this message\n";
 }
 
@@ -70,6 +76,9 @@ Options parse_args(int argc, char** argv) {
 
     if (arg == "--help") {
       print_help();
+      std::exit(0);
+    } else if (arg == "--version") {
+      std::cout << "esfc " << kVersion << "\n";
       std::exit(0);
     } else if (arg == "--system") {
       opts.system = require_value(i, argc, argv);
@@ -95,6 +104,8 @@ Options parse_args(int argc, char** argv) {
       opts.dt = std::stod(require_value(i, argc, argv));
     } else if (arg == "--seed") {
       opts.seed = static_cast<unsigned int>(std::stoul(require_value(i, argc, argv)));
+    } else if (arg == "--freq-mode") {
+      opts.freq_mode = require_value(i, argc, argv);
     } else if (arg == "--omega-mean") {
       opts.omega_mean = std::stod(require_value(i, argc, argv));
     } else if (arg == "--omega-std") {
@@ -121,10 +132,19 @@ int main(int argc, char** argv) {
         ? ba_network(opts.n, opts.m, rng)
         : er_network(opts.n, opts.p, rng);
 
-    std::normal_distribution<double> omega_dist(opts.omega_mean, opts.omega_std);
     std::vector<double> omega(opts.n);
-    for (int i = 0; i < opts.n; ++i) {
-      omega[i] = omega_dist(rng);
+    if (opts.freq_mode == "gaussian") {
+      std::normal_distribution<double> omega_dist(opts.omega_mean, opts.omega_std);
+      for (int i = 0; i < opts.n; ++i) {
+        omega[i] = omega_dist(rng);
+      }
+    } else if (opts.freq_mode == "degree-weighted") {
+      const double omega_bar = (opts.omega_mean == 0.0) ? 1.0 : opts.omega_mean;
+      for (int i = 0; i < opts.n; ++i) {
+        omega[i] = omega_bar * static_cast<double>(net.adj[i].size());
+      }
+    } else {
+      throw std::runtime_error("Unknown freq mode: " + opts.freq_mode);
     }
 
     SimulationResult result;
@@ -165,7 +185,12 @@ int main(int argc, char** argv) {
       throw std::runtime_error("Unknown system: " + opts.system);
     }
 
-    std::ofstream out(opts.out);
+    std::filesystem::path out_path(opts.out);
+    if (out_path.has_parent_path()) {
+      std::filesystem::create_directories(out_path.parent_path());
+    }
+
+    std::ofstream out(out_path);
     if (!out) {
       throw std::runtime_error("Failed to open output file: " + opts.out);
     }

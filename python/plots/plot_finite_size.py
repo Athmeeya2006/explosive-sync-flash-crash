@@ -22,15 +22,25 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    data = np.genfromtxt(args.input, delimiter=",", names=True)
+    data = np.atleast_1d(np.genfromtxt(args.input, delimiter=",", names=True))
 
     fig, ax = plt.subplots(figsize=(7.0, 4.0))
     for n in np.unique(data["n"]):
         mask = data["n"] == n
         k_vals = data["k"][mask]
-        order_vals = data["order"][mask]
+        order_mean = data["order_mean"][mask]
+        order_std = data["order_std"][mask]
         idx = np.argsort(k_vals)
-        ax.plot(k_vals[idx], order_vals[idx], marker="o", label=f"N={int(n)}")
+        ax.errorbar(k_vals[idx], order_mean[idx], yerr=order_std[idx], marker="o", markersize=4, capsize=3, label=f"N={int(n)}")
+
+    # Add theoretical mean-field curve
+    # g(0) for standard normal is 1 / sqrt(2*pi)
+    # K_c = 2 / (pi * g(0)) = 2 * sqrt(2*pi) / pi = sqrt(8 / pi)
+    k_c = np.sqrt(8 / np.pi)
+    k_max = np.max(np.atleast_1d(data["k"]))
+    k_theory = np.linspace(0, k_max, 500)
+    r_theory = np.where(k_theory < k_c, 0.0, np.sqrt(1 - k_c / np.maximum(k_theory, 1e-12)))
+    ax.plot(k_theory, r_theory, 'k--', lw=2, label="Mean-field theory")
 
     ax.set_xlabel("coupling k")
     ax.set_ylabel("steady order")

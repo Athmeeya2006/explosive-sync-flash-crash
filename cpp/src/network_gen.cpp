@@ -1,7 +1,6 @@
 #include "network_gen.hpp"
 
 #include <stdexcept>
-#include <unordered_set>
 
 namespace {
 void add_edge(Network& net, int a, int b) {
@@ -45,38 +44,36 @@ Network ba_network(int n, int m, std::mt19937& rng) {
 
   Network net;
   net.adj.assign(n, {});
+  std::vector<int> degree(n, 0);
 
   const int m0 = m + 1;
   for (int i = 0; i < m0; ++i) {
     for (int j = i + 1; j < m0; ++j) {
       add_edge(net, i, j);
-    }
-  }
-
-  std::vector<int> repeated;
-  repeated.reserve(m0 * m0);
-  for (int i = 0; i < m0; ++i) {
-    for (int k = 0; k < m0 - 1; ++k) {
-      repeated.push_back(i);
+      degree[i] += 1;
+      degree[j] += 1;
     }
   }
 
   for (int node = m0; node < n; ++node) {
-    std::unordered_set<int> targets;
-    std::uniform_int_distribution<int> dist(0, static_cast<int>(repeated.size() - 1));
+    std::vector<double> weights(node);
+    for (int i = 0; i < node; ++i) {
+      weights[i] = static_cast<double>(degree[i]);
+    }
 
-    while (static_cast<int>(targets.size()) < m) {
-      int candidate = repeated[dist(rng)];
-      targets.insert(candidate);
+    std::vector<int> targets;
+    targets.reserve(m);
+    for (int edge = 0; edge < m; ++edge) {
+      std::discrete_distribution<int> dist(weights.begin(), weights.end());
+      int target = dist(rng);
+      targets.push_back(target);
+      weights[target] = 0.0;
     }
 
     for (int target : targets) {
       add_edge(net, node, target);
-      repeated.push_back(target);
-    }
-
-    for (int k = 0; k < static_cast<int>(targets.size()); ++k) {
-      repeated.push_back(node);
+      degree[node] += 1;
+      degree[target] += 1;
     }
   }
 

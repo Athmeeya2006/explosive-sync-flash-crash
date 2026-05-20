@@ -22,7 +22,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    data = np.genfromtxt(args.input, delimiter=",", names=True)
+    data = np.atleast_1d(np.genfromtxt(args.input, delimiter=",", names=True))
 
     n_vals = np.unique(data["n"]).astype(int)
     k_vals = np.unique(data["k"])
@@ -31,17 +31,14 @@ def main() -> None:
     for row in data:
         n_idx = np.where(n_vals == int(row["n"]))[0][0]
         k_idx = np.where(k_vals == row["k"])[0][0]
-        grid[n_idx, k_idx] = row["order"]
+        grid[n_idx, k_idx] = row["order_mean"]
 
     fig, ax = plt.subplots(figsize=(6.8, 4.5))
-    im = ax.imshow(
-        grid,
-        origin="lower",
-        aspect="auto",
-        extent=[k_vals.min(), k_vals.max(), n_vals.min(), n_vals.max()],
-    )
+    k_mesh, n_mesh = np.meshgrid(k_vals, n_vals)
+    im = ax.pcolormesh(k_mesh, n_mesh, grid, shading="nearest", cmap="viridis")
     ax.set_xlabel("coupling k")
     ax.set_ylabel("system size N")
+    ax.set_yticks(n_vals)
     ax.set_title("Phase diagram")
     fig.colorbar(im, ax=ax, label="steady order")
 

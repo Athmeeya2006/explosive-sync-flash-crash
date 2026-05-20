@@ -14,3 +14,5 @@ add_executable(esfc
 )
 
 target_include_directories(esfc PRIVATE src include)
+target_compile_options(esfc PRIVATE -O2 -Wall -Wextra -Wpedantic)
+target_link_libraries(esfc PRIVATE stdc++fs)

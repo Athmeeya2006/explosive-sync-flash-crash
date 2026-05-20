@@ -9,7 +9,7 @@ PYTHON_DIR = ROOT / "python"
 if str(PYTHON_DIR) not in sys.path:
     sys.path.insert(0, str(PYTHON_DIR))
 
-from utils.helpers import load_timeseries_csv
+from utils.helpers import ensure_dir, load_timeseries_csv
 
 
 def rolling_metrics(series: np.ndarray, window: int) -> tuple[np.ndarray, np.ndarray]:
@@ -18,10 +18,11 @@ def rolling_metrics(series: np.ndarray, window: int) -> tuple[np.ndarray, np.nda
 
     for i in range(window, len(series) + 1):
         segment = series[i - window : i]
-        var[i - 1] = np.var(segment)
+        mean = segment.mean()
+        var[i - 1] = np.mean((segment - mean) ** 2)
         if window > 1:
-            x0 = segment[:-1] - segment[:-1].mean()
-            x1 = segment[1:] - segment[1:].mean()
+            x0 = segment[:-1] - mean
+            x1 = segment[1:] - mean
             denom = np.sqrt(np.sum(x0 * x0) * np.sum(x1 * x1))
             ac[i - 1] = np.sum(x0 * x1) / denom if denom > 0 else np.nan
 
@@ -44,7 +45,7 @@ def main() -> None:
     var, ac = rolling_metrics(order, window)
 
     out_path = Path(args.out)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+    ensure_dir(out_path.parent)
     data = np.column_stack([times, order, var, ac])
     np.savetxt(
         out_path,
@@ -52,6 +53,7 @@ def main() -> None:
         delimiter=",",
         header="t,order,variance,autocorr",
         comments="",
+        fmt=["%.6f", "%.10e", "%.10e", "%.10e"],
     )
     print(f"Saved early warning metrics to {out_path}")
 
